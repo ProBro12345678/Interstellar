@@ -51,7 +51,7 @@ function resolvePort() {
     break;
   }
 
-  return flag ? Number(flag) : process.env.PORT || 8080;
+  return flag ? Number(flag) : process.env.PORT || 8081;
 }
 
 const PORT = resolvePort();
