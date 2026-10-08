@@ -117,20 +117,17 @@ app.post("/start", async (req, res) => {
 
 const controlServer = http.createServer(app);
 
-// Proxy ordinary HTTP traffic to Interstellar while keeping the public URL on port 8080.
-controlServer.on("request", async (req, res) => {
-  if (req.url === "/" || req.url === "/start") return;
-
+// Proxy ordinary HTTP traffic only after Express routes have had a chance to respond.
+app.use(async (req, res) => {
   if (!(await serverIsListening())) {
-    res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8" });
-    return res.end("Interstellar is offline. Return to / to start it.");
+    return res.status(503).type("text/plain").send("Interstellar is offline. Return to / to start it.");
   }
 
   const proxy = http.request({
     hostname: "127.0.0.1",
     port: INTERSTELLAR_PORT,
     method: req.method,
-    path: req.url,
+    path: req.originalUrl,
     headers: { ...req.headers, host: `127.0.0.1:${INTERSTELLAR_PORT}` },
   }, proxyRes => {
     res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
