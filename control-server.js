@@ -1,6 +1,6 @@
-import { spawn } from "node:child_process";
 import http from "node:http";
 import net from "node:net";
+import { spawn } from "node:child_process";
 import express from "express";
 
 const app = express();
@@ -64,40 +64,38 @@ button{padding:12px 22px;border:0;border-radius:7px;cursor:pointer;font-weight:b
 </html>`;
 }
 
-app.get("/", async (_req, res) => {
+app.get("/", async (req, res) => {
   if (await serverIsListening()) {
-    return res.send(
-      page(
-        "Interstellar",
-        `
-      <h1>Interstellar is running</h1>
-      <p class="status">Opening Interstellar...</p>
-      <script>location.replace("/__interstellar__")</script>
-    `,
-      ),
-    );
+    const proxy = http.request({
+      hostname: "127.0.0.1",
+      port: INTERSTELLAR_PORT,
+      method: "GET",
+      path: "/",
+      headers: { ...req.headers, host: `127.0.0.1:${INTERSTELLAR_PORT}` },
+    }, proxyRes => {
+      res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+      proxyRes.pipe(res);
+    });
+    proxy.on("error", err => {
+      console.error("Root proxy error:", err);
+      if (!res.headersSent) res.writeHead(502);
+      res.end("Could not reach Interstellar.");
+    });
+    proxy.end();
+    return;
   }
 
-  res.send(
-    page(
-      "Interstellar Server",
-      `
+  res.send(page("Interstellar Server", `
     <h1>Interstellar</h1>
     <p class="status">Server is currently offline.</p>
-    ${
-      PASSWORD
-        ? `
+    ${PASSWORD ? `
     <form method="POST" action="/start">
       <input type="password" name="password" placeholder="Password" required autofocus>
       <button type="submit">Start Server</button>
-    </form>`
-        : `
+    </form>` : `
     <p class="error">CONTROL_PASSWORD has not been configured.</p>
-    <p>Set the Codespace secret/environment variable and restart the control server.</p>`
-    }
-  `,
-    ),
-  );
+    <p>Set the Codespace secret/environment variable and restart the control server.</p>`}
+  `));
 });
 
 app.post("/start", async (req, res) => {
@@ -117,35 +115,27 @@ app.post("/start", async (req, res) => {
   res.status(504).send(page("Startup failed", "<h1>Startup timed out</h1><p>Interstellar did not start on port 8081. Check the Codespace terminal/logs.</p><p><a href='/' style='color:white'>Try again</a></p>"));
 });
 
-app.get("/__interstellar__", async (_req, res) => {
-  if (!(await serverIsListening())) return res.redirect("/");
-  res.redirect("/");
-});
-
 const controlServer = http.createServer(app);
 
 // Proxy ordinary HTTP traffic to Interstellar while keeping the public URL on port 8080.
 controlServer.on("request", async (req, res) => {
-  if (req.url === "/" || req.url === "/start" || req.url === "/__interstellar__") return;
+  if (req.url === "/" || req.url === "/start") return;
 
   if (!(await serverIsListening())) {
     res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8" });
     return res.end("Interstellar is offline. Return to / to start it.");
   }
 
-  const proxy = http.request(
-    {
-      hostname: "127.0.0.1",
-      port: INTERSTELLAR_PORT,
-      method: req.method,
-      path: req.url,
-      headers: { ...req.headers, host: `127.0.0.1:${INTERSTELLAR_PORT}` },
-    },
-    proxyRes => {
-      res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
-      proxyRes.pipe(res);
-    },
-  );
+  const proxy = http.request({
+    hostname: "127.0.0.1",
+    port: INTERSTELLAR_PORT,
+    method: req.method,
+    path: req.url,
+    headers: { ...req.headers, host: `127.0.0.1:${INTERSTELLAR_PORT}` },
+  }, proxyRes => {
+    res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+    proxyRes.pipe(res);
+  });
 
   proxy.on("error", err => {
     console.error("Proxy error:", err);
