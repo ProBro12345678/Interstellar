@@ -1,6 +1,6 @@
+import { spawn } from "node:child_process";
 import http from "node:http";
 import net from "node:net";
-import { spawn } from "node:child_process";
 import express from "express";
 
 const app = express();
@@ -66,24 +66,38 @@ button{padding:12px 22px;border:0;border-radius:7px;cursor:pointer;font-weight:b
 
 app.get("/", async (_req, res) => {
   if (await serverIsListening()) {
-    return res.send(page("Interstellar", `
+    return res.send(
+      page(
+        "Interstellar",
+        `
       <h1>Interstellar is running</h1>
       <p class="status">Opening Interstellar...</p>
       <script>location.replace("/__interstellar__")</script>
-    `));
+    `,
+      ),
+    );
   }
 
-  res.send(page("Interstellar Server", `
+  res.send(
+    page(
+      "Interstellar Server",
+      `
     <h1>Interstellar</h1>
     <p class="status">Server is currently offline.</p>
-    ${PASSWORD ? `
+    ${
+      PASSWORD
+        ? `
     <form method="POST" action="/start">
       <input type="password" name="password" placeholder="Password" required autofocus>
       <button type="submit">Start Server</button>
-    </form>` : `
+    </form>`
+        : `
     <p class="error">CONTROL_PASSWORD has not been configured.</p>
-    <p>Set the Codespace secret/environment variable and restart the control server.</p>`}
-  `));
+    <p>Set the Codespace secret/environment variable and restart the control server.</p>`
+    }
+  `,
+    ),
+  );
 });
 
 app.post("/start", async (req, res) => {
@@ -119,16 +133,19 @@ controlServer.on("request", async (req, res) => {
     return res.end("Interstellar is offline. Return to / to start it.");
   }
 
-  const proxy = http.request({
-    hostname: "127.0.0.1",
-    port: INTERSTELLAR_PORT,
-    method: req.method,
-    path: req.url,
-    headers: { ...req.headers, host: `127.0.0.1:${INTERSTELLAR_PORT}` },
-  }, proxyRes => {
-    res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
-    proxyRes.pipe(res);
-  });
+  const proxy = http.request(
+    {
+      hostname: "127.0.0.1",
+      port: INTERSTELLAR_PORT,
+      method: req.method,
+      path: req.url,
+      headers: { ...req.headers, host: `127.0.0.1:${INTERSTELLAR_PORT}` },
+    },
+    proxyRes => {
+      res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+      proxyRes.pipe(res);
+    },
+  );
 
   proxy.on("error", err => {
     console.error("Proxy error:", err);
