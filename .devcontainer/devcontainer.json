@@ -1,4 +1,4 @@
 {
-  "forwardPorts": [8081],
-  "postStartCommand": "gh codespace ports visibility 8080:public -c \"$CODESPACE_NAME\""
+  "forwardPorts": [8080],
+  "postStartCommand": "nohup npm run control > /tmp/interstellar-control.log 2>&1 & gh codespace ports visibility 8080:public -c \"$CODESPACE_NAME\""
 }
